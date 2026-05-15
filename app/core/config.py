@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     supabase_service_key: str = Field(..., alias="SUPABASE_SERVICE_KEY")
     max_pdf_size_mb: int = Field(default=20, alias="MAX_PDF_SIZE_MB")
     arxiv_request_timeout: int = Field(default=30, alias="ARXIV_REQUEST_TIMEOUT")
+    e2b_api_key: str = Field(default="", alias="E2B_API_KEY")
 
     model_config = {"env_file": ".env", "populate_by_name": True}
 
