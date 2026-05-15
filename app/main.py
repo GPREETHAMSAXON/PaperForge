@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging, get_logger
-from app.api.routes import health, parse, analyze, generate
+from app.api.routes import health, parse, analyze, generate, benchmark
 
 settings = get_settings()
 setup_logging()
@@ -64,6 +64,7 @@ app.include_router(health.router)
 app.include_router(parse.router, prefix="/api/v1")
 app.include_router(analyze.router, prefix="/api/v1")
 app.include_router(generate.router, prefix="/api/v1")
+app.include_router(benchmark.router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)

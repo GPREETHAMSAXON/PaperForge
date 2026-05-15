@@ -4,6 +4,7 @@ import InputBar from './components/InputBar';
 import HeroSection from './components/HeroSection';
 import AnalysisPanel from './components/AnalysisPanel';
 import CodePanel from './components/CodePanel';
+import BenchmarkPanel from './components/BenchmarkPanel';
 import ErrorBanner from './components/ErrorBanner';
 import { AnalysisSkeleton, CodeSkeleton } from './components/LoadingPanels';
 import { usePaperForge, STAGES } from './hooks/usePaperForge';
@@ -36,26 +37,37 @@ export default function App() {
         {isError && <ErrorBanner message={error} onDismiss={reset} />}
         {showHero && <HeroSection />}
         {showPanels && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
-            <div>
-              <SectionLabel
-                label="Methodology"
-                sub={analysis ? `${analysis.key_algorithm} · ${analysis.paper_type}` : 'Reading paper...'}
-              />
-              {isLoading && !analysis ? <AnalysisSkeleton /> : (
-                <AnalysisPanel analysis={analysis} paperMeta={paperMeta} tokensUsed={tokensUsed} />
-              )}
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
+              <div>
+                <SectionLabel
+                  label="Methodology"
+                  sub={analysis ? `${analysis.key_algorithm} · ${analysis.paper_type}` : 'Reading paper...'}
+                />
+                {isLoading && !analysis ? <AnalysisSkeleton /> : (
+                  <AnalysisPanel analysis={analysis} paperMeta={paperMeta} tokensUsed={tokensUsed} />
+                )}
+              </div>
+              <div>
+                <SectionLabel
+                  label="Implementation"
+                  sub={generatedCode ? `${generatedCode.strategy} · ${generatedCode.estimated_lines} lines` : 'Generating code...'}
+                />
+                {isLoading && !generatedCode ? <CodeSkeleton /> : (
+                  <CodePanel generatedCode={generatedCode} onRegenerate={regenerateCode} isRegenerating={isRegenerating} />
+                )}
+              </div>
             </div>
-            <div>
-              <SectionLabel
-                label="Implementation"
-                sub={generatedCode ? `${generatedCode.strategy} · ${generatedCode.estimated_lines} lines` : 'Generating code...'}
+
+            {/* Benchmark panel — full width below, only shown when done */}
+            {isDone && analysis && generatedCode && (
+              <BenchmarkPanel
+                analysis={analysis}
+                generatedCode={generatedCode}
+                paperMeta={paperMeta}
               />
-              {isLoading && !generatedCode ? <CodeSkeleton /> : (
-                <CodePanel generatedCode={generatedCode} onRegenerate={regenerateCode} isRegenerating={isRegenerating} />
-              )}
-            </div>
-          </div>
+            )}
+          </>
         )}
       </main>
     </div>
