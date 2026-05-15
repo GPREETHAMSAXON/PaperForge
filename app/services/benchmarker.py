@@ -2,11 +2,11 @@ import asyncio
 import time
 import json
 import re
+import os
 from anthropic import AsyncAnthropic
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.models.paper import PaperAnalysis
 from app.models.benchmark import BenchmarkResult, BenchmarkStatus, MetricResult
 
 logger = get_logger(__name__)
@@ -95,7 +95,9 @@ class Benchmarker:
         stdout = out.get("stdout", "")
         stderr = out.get("stderr", "")
         metrics = self._parse_metrics(stdout, analysis.reported_results)
-        interpretation, tokens = await self._interpret(analysis, rows, cols, metrics, "success" if metrics else "partial")
+        interpretation, tokens = await self._interpret(
+            analysis, rows, cols, metrics, "success" if metrics else "partial"
+        )
         status = BenchmarkStatus.SUCCESS if metrics else BenchmarkStatus.PARTIAL
 
         return BenchmarkResult(
@@ -125,24 +127,75 @@ class Benchmarker:
 
     def _sync_e2b(self, code, dependencies):
         from e2b_code_interpreter import Sandbox
+        os.environ["E2B_API_KEY"] = settings.e2b_api_key
         stdout_lines, stderr_lines = [], []
         safe_deps = list(set(["pandas", "numpy", "scikit-learn"] + [
             d for d in dependencies if d not in ("torch", "tensorflow", "jax")
         ]))
-        with Sandbox(api_key=settings.e2b_api_key) as sbx:
+        sanitized_code = self._sanitize_code(code)
+        with Sandbox.create() as sbx:
             sbx.run_code(
-                "import subprocess; subprocess.run(['pip', 'install'] + "
-                + repr(safe_deps) + ", capture_output=True)"
+                f"import subprocess; subprocess.run(['pip', 'install'] + {repr(safe_deps)}, "
+                f"capture_output=True, text=True)"
             )
-            execution = sbx.run_code(code)
+            execution = sbx.run_code(sanitized_code)
             for log in execution.logs.stdout:
                 stdout_lines.append(str(log))
             for log in execution.logs.stderr:
                 stderr_lines.append(str(log))
             if execution.error:
-                return {"status": "error", "stdout": "\n".join(stdout_lines),
-                        "stderr": "\n".join(stderr_lines), "error": str(execution.error)}
-            return {"status": "success", "stdout": "\n".join(stdout_lines), "stderr": "\n".join(stderr_lines)}
+                return {
+                    "status": "error",
+                    "stdout": "\n".join(stdout_lines),
+                    "stderr": "\n".join(stderr_lines),
+                    "error": str(execution.error),
+                }
+            return {
+                "status": "success",
+                "stdout": "\n".join(stdout_lines),
+                "stderr": "\n".join(stderr_lines),
+            }
+
+    def _sanitize_code(self, code: str) -> str:
+        """Comment out torch/tensorflow/jax code — not available in E2B sandbox."""
+        lines = code.split("\n")
+        sanitized = []
+        skip_class = False
+        skip_indent = ""
+
+        for line in lines:
+            stripped = line.strip()
+
+            # Detect class definitions that inherit from nn.Module or torch classes
+            if stripped.startswith("class ") and ("nn.Module" in stripped or "torch" in stripped):
+                skip_class = True
+                skip_indent = len(line) - len(line.lstrip())
+                sanitized.append(f"# {line}  # skipped: requires torch")
+                continue
+
+            # If we're inside a skipped class, skip until indentation returns
+            if skip_class:
+                if stripped == "" or stripped.startswith("#"):
+                    sanitized.append(f"# {line}")
+                    continue
+                current_indent = len(line) - len(line.lstrip())
+                if current_indent > skip_indent:
+                    sanitized.append(f"# {line}  # skipped")
+                    continue
+                else:
+                    skip_class = False
+
+            # Skip heavy framework imports
+            if any(
+                stripped.startswith(f"import {lib}") or stripped.startswith(f"from {lib}")
+                for lib in ("torch", "tensorflow", "jax", "tf")
+            ):
+                sanitized.append(f"# {line}  # skipped: not available in sandbox")
+                continue
+
+            sanitized.append(line)
+
+        return "\n".join(sanitized)
 
     def _parse_metrics(self, stdout, reported_results):
         metrics = []
@@ -160,9 +213,11 @@ class Benchmarker:
                             except Exception:
                                 pass
                         metrics.append(MetricResult(
-                            name=k, your_value=v if isinstance(v, float) else None,
+                            name=k,
+                            your_value=v if isinstance(v, float) else None,
                             paper_value=paper_val,
-                            higher_is_better=self._higher_is_better(k), gap_pct=gap,
+                            higher_is_better=self._higher_is_better(k),
+                            gap_pct=gap,
                         ))
                 except Exception:
                     pass
@@ -200,13 +255,18 @@ class Benchmarker:
             f"{m.name}={m.your_value} (paper: {m.paper_value})" for m in metrics
         ) or "no metrics extracted"
         prompt = INTERPRET_PROMPT.format(
-            title=analysis.title, key_algorithm=analysis.key_algorithm,
+            title=analysis.title,
+            key_algorithm=analysis.key_algorithm,
             reported_results=json.dumps(analysis.reported_results),
-            dataset_rows=rows, dataset_cols=cols, metrics=metrics_str, status=status,
+            dataset_rows=rows,
+            dataset_cols=cols,
+            metrics=metrics_str,
+            status=status,
         )
         try:
             resp = await self._claude.messages.create(
-                model=settings.claude_model, max_tokens=300,
+                model=settings.claude_model,
+                max_tokens=300,
                 messages=[{"role": "user", "content": prompt}],
             )
             return resp.content[0].text.strip(), resp.usage.input_tokens + resp.usage.output_tokens
@@ -216,6 +276,7 @@ class Benchmarker:
 
 
 _benchmarker = None
+
 
 def get_benchmarker():
     global _benchmarker
