@@ -184,6 +184,10 @@ def _parse_response(raw: str, arxiv_id: str | None) -> GeneratedCode:
     if data.get("estimated_lines", 0) == 0 and code:
         data["estimated_lines"] = len(code.split("\n"))
 
+    # Coerce limitations to string if Claude returns a list
+    if isinstance(data.get("limitations"), list):
+        data["limitations"] = "\n".join(f"• {item}" for item in data["limitations"])
+
     try:
         return GeneratedCode(**data)
     except Exception as exc:
