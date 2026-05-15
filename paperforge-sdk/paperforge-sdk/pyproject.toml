@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "paperforge-sdk"
+version = "0.2.0"
+description = "Convert arXiv research papers into runnable Python implementations using Claude AI"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Saxon", email = "gpreethamsaxon@gmail.com" }]
+keywords = ["arxiv", "research", "machine-learning", "llm", "claude", "code-generation", "papers"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.20.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.urls]
+Homepage = "https://github.com/GPREETHAMSAXON/paperforge"
+Documentation = "https://github.com/GPREETHAMSAXON/paperforge#readme"
+Repository = "https://github.com/GPREETHAMSAXON/paperforge"
+"Bug Tracker" = "https://github.com/GPREETHAMSAXON/paperforge/issues"
+
+[tool.setuptools.packages.find]
+include = ["paperforge*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
