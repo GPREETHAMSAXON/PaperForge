@@ -1,3 +1,7 @@
 .env 
 __pycache__/ 
 *.pyc 
+paperforge.egg-info/
+*.egg-info/
+runtime.txt
+conftest.py
